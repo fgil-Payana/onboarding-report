@@ -23,7 +23,7 @@ SLACK_WEBHOOK    = os.environ["SLACK_WEBHOOK_URL"]
 POSTHOG_BASE     = f"https://us.posthog.com/api/projects/{POSTHOG_PROJECT}"
 
 TEMPLATE_FILE    = "payana_reporte_unificado.html"
-OUTPUT_FILE      = "index.html"          # GitHub Pages serves index.html at root
+OUTPUT_FILE      = "docs/index.html"      # GitHub Pages serves from docs/ folder
 
 # ── Views to query ────────────────────────────────────────────────────────────
 VIEWS = {
@@ -122,7 +122,7 @@ def send_slack(datasets: dict[str, list[dict]]):
     completaron = sum(1 for r in f4_rows if "Completó 4" in (r.get("estado_pago") or ""))
 
     today_str = datetime.date.today().strftime("%d %b %Y")
-    report_url = "https://payana-io.github.io/onboarding-report/"
+    report_url = "https://fgil-payana.github.io/onboarding-report/"
 
     payload = {
         "blocks": [
@@ -175,6 +175,7 @@ def main():
     updated_html = update_html(datasets)
 
     # 3. Write output
+    import os; os.makedirs("docs", exist_ok=True)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write(updated_html)
     print(f"\n3. Written → {OUTPUT_FILE}")
