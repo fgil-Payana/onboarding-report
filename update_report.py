@@ -27,7 +27,7 @@ OUTPUT_FILE      = "index.html"          # GitHub Pages serves index.html at roo
 
 # ── Views to query ────────────────────────────────────────────────────────────
 VIEWS = {
-    "P_DATA":   "OnBoarding_Blocks",
+    "P_RAW":    "OnBoarding_Blocks",           # Se inyecta como P_RAW (el HTML lo transforma a P_DATA con .map())
     "U_DATA":   "OnBoarding_TableroControl",
     "M1_DATA":  "OnBoarding_ForecastM1",
     "F4_DATA":  "OnBoarding_ControlFacturacion",
@@ -107,7 +107,7 @@ def update_html(datasets: dict[str, list[dict]]) -> str:
 
 # ── Slack notification ────────────────────────────────────────────────────────
 def send_slack(datasets: dict[str, list[dict]]):
-    p_rows  = datasets["P_DATA"]
+    p_rows  = datasets["P_RAW"]
     u_rows  = datasets["U_DATA"]
     m1_rows = datasets["M1_DATA"]
     f4_rows = datasets["F4_DATA"]
