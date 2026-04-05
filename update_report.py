@@ -47,8 +47,18 @@ def posthog_query(sql: str) -> list[dict]:
             "Content-Type":  "application/json",
         },
     )
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        data = json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"PostHog API error {e.code} for query:\n  {sql}\n"
+            f"Response: {body_text[:500]}\n\n"
+            f"Tip: Make sure POSTHOG_API_KEY is a Personal API Key (starts with phx_), "
+            f"not a Project API key (phc_). Create one at: "
+            f"https://us.posthog.com/settings/user-api-keys"
+        ) from e
 
     columns = [c if isinstance(c, str) else c.get("name", c) for c in data["columns"]]
     return [dict(zip(columns, row)) for row in data["results"]]
