@@ -12,6 +12,8 @@ permissions:
 jobs:
   update-report:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # usa Node.js 24 en todas las actions
 
     steps:
       # 1. Checkout del repo (rama main)
@@ -27,8 +29,8 @@ jobs:
       # 3. Correr el script (sin dependencias externas — solo stdlib)
       - name: Update report
         env:
-          POSTHOG_API_KEY:  ${{ secrets.POSTHOG_API_KEY }}
-          POSTHOG_PROJECT:  ${{ secrets.POSTHOG_PROJECT }}
+          POSTHOG_API_KEY:   ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_PROJECT:   ${{ secrets.POSTHOG_PROJECT }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: python update_report.py
 
@@ -37,7 +39,5 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./          # publica index.html desde la raíz
+          publish_dir: ./
           publish_branch: gh-pages
-          # Solo publica index.html, no el resto del repo
-          include_files: index.html
