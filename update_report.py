@@ -57,40 +57,110 @@ def json_serial(obj):
 
 
 def to_js_json(data):
-    # One JSON object per line — avoids Chrome's 32KB single-line limit
+    """One JSON object per line — avoids Chrome's 32KB single-line limit."""
     rows = [json.dumps(row, default=json_serial, ensure_ascii=False) for row in data]
-    return '[' + ',\n'.join(rows) + ']'
+    return "[\n" + ",\n".join(rows) + "\n]"
+
+
+def extract_js_array(html, var_name):
+    """
+    Extract a JS array by bracket matching.
+    Handles arrays with JS comments inside (e.g. // SET UP).
+    Returns (start_pos, end_pos, array_string) or (None, None, None).
+    """
+    idx = html.find(f"const {var_name} = [")
+    if idx == -1:
+        return None, None, None
+    start = html.find("[", idx)
+    depth, in_string, escape, pos = 0, False, False, start
+    while pos < len(html):
+        c = html[pos]
+        if escape:
+            escape = False
+        elif c == "\\" and in_string:
+            escape = True
+        elif c == '"' and not escape:
+            in_string = not in_string
+        elif not in_string:
+            if c == "[":
+                depth += 1
+            elif c == "]":
+                depth -= 1
+                if depth == 0:
+                    return start, pos + 1, html[start : pos + 1]
+        pos += 1
+    return None, None, None
+
+
+def reformat_existing_arrays(html):
+    """
+    Post-processing safety net: find any const VAR = [...] blocks that
+    ended up on a single long line and reformat them to one-row-per-line.
+    This handles the case where the template itself has long inline arrays
+    that weren't replaced (e.g. HS_DATE or leftover data from a prior run).
+    """
+    for var_name in ["P_RAW", "U_DATA", "M1_DATA", "F4_DATA"]:
+        start, end, js_str = extract_js_array(html, var_name)
+        if start is None:
+            continue
+        # Only reformat if it's a single long line (>500 chars with no newlines)
+        if "\n" not in js_str and len(js_str) > 500:
+            # Strip JS comments, parse, reformat
+            cleaned = re.sub(r"//[^\n]*", "", js_str)
+            try:
+                data = json.loads(cleaned)
+                new_js = to_js_json(data)
+                html = html[:start] + new_js + html[end:]
+                print(f"  Reformatted existing {var_name} ({len(js_str)} → multiline)")
+            except Exception as e:
+                print(f"  WARNING: could not reformat {var_name}: {e}")
+    return html
 
 
 def update_html(datasets):
     with open(TEMPLATE_FILE, "r", encoding="utf-8") as f:
         html = f.read()
 
-    # 1. Inject data arrays
+    # 1. Inject fresh data arrays (one row per line)
     for var_name, rows in datasets.items():
         new_js  = to_js_json(rows)
         pattern = rf"(const {re.escape(var_name)}\s*=\s*)\[.*?\](?=\s*;)"
-        # Lambda prevents re.subn from interpreting \n in new_js as literal newlines
         js_snap = new_js
-        html, n = re.subn(pattern, lambda m, js=js_snap: m.group(1) + js, html, count=1, flags=re.DOTALL)
+        # Lambda avoids re.subn interpreting \n in new_js as literal newlines
+        html, n = re.subn(
+            pattern,
+            lambda m, js=js_snap: m.group(1) + js,
+            html,
+            count=1,
+            flags=re.DOTALL,
+        )
         if n == 0:
             raise ValueError(f"Could not find 'const {var_name} = [...]' in template.")
         print(f"  OK {var_name} injected ({len(rows)} rows)")
 
-    # 2. Update TODAY / TODAY_F  ← THE KEY FIX
-    #    The template has hardcoded dates like new Date('2026-03-27').
-    #    Without updating them, daysFrom() returns wrong/negative values
-    #    and the entire pipeline section renders empty.
+    # 2. Safety net: reformat any remaining single-line arrays
+    #    (e.g. HS_DATE or arrays that were already in the template as data)
+    html = reformat_existing_arrays(html)
+
+    # 3. Update TODAY / TODAY_F
     today_iso   = datetime.date.today().isoformat()
     date_re     = re.compile(r"new Date\('\d{4}-\d{2}-\d{2}'\)")
     replacement = "new Date('" + today_iso + "')"
     html, n_d   = date_re.subn(replacement, html)
     print(f"  OK TODAY updated -> {today_iso} ({n_d} occurrences)")
 
-    # 3. Update footer stamps
+    # 4. Update footer stamps
     today_fmt = datetime.date.today().strftime("%d %b %Y")
     html = re.sub(r"HubSpot \xb7 \w+ \d{4}", f"PostHog \xb7 {today_fmt}", html)
     html = re.sub(r"PostHog \xb7 \d{2} \w{3} \d{4}", f"PostHog \xb7 {today_fmt}", html)
+
+    # 5. Final check: warn if any line is still suspiciously long
+    long_lines = [(i + 1, len(l)) for i, l in enumerate(html.split("\n")) if len(l) > 10000]
+    if long_lines:
+        for ln, llen in long_lines:
+            print(f"  WARNING: line {ln} still has {llen} chars — may cause Chrome errors")
+    else:
+        print("  OK All lines within safe length")
 
     return html
 
@@ -125,13 +195,14 @@ def send_slack(datasets):
             "type": "button",
             "text": {"type": "plain_text", "text": "Ver reporte completo"},
             "url": report_url,
-            "style": "primary"
-        }]}
+            "style": "primary",
+        }]},
     ]}
 
     body = json.dumps(payload).encode()
-    req  = urllib.request.Request(SLACK_WEBHOOK, data=body,
-                                   headers={"Content-Type": "application/json"})
+    req  = urllib.request.Request(
+        SLACK_WEBHOOK, data=body, headers={"Content-Type": "application/json"}
+    )
     with urllib.request.urlopen(req, timeout=15) as resp:
         print(f"  Slack -> {resp.status}")
 
