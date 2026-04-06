@@ -23,7 +23,7 @@ SLACK_WEBHOOK    = os.environ["SLACK_WEBHOOK_URL"]
 POSTHOG_BASE     = f"https://us.posthog.com/api/projects/{POSTHOG_PROJECT}"
 
 TEMPLATE_FILE    = "payana_reporte_unificado.html"
-OUTPUT_FILE      = "docs/index.html"      # GitHub Pages serves from docs/ folder
+OUTPUT_FILE      = "index.html"            # generado en raiz del runner
 
 # ── Views to query ────────────────────────────────────────────────────────────
 VIEWS = {
@@ -175,7 +175,6 @@ def main():
     updated_html = update_html(datasets)
 
     # 3. Write output
-    import os; os.makedirs("docs", exist_ok=True)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write(updated_html)
     print(f"\n3. Written → {OUTPUT_FILE}")
