@@ -57,7 +57,9 @@ def json_serial(obj):
 
 
 def to_js_json(data):
-    return json.dumps(data, default=json_serial, ensure_ascii=False, indent=None)
+    # One JSON object per line — avoids Chrome's 32KB single-line limit
+    rows = [json.dumps(row, default=json_serial, ensure_ascii=False) for row in data]
+    return '[' + ',\n'.join(rows) + ']'
 
 
 def update_html(datasets):
