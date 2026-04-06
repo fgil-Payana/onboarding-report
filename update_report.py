@@ -68,7 +68,9 @@ def update_html(datasets):
     for var_name, rows in datasets.items():
         new_js  = to_js_json(rows)
         pattern = rf"(const {re.escape(var_name)}\s*=\s*)\[.*?\](?=\s*;)"
-        html, n = re.subn(pattern, rf"\g<1>{new_js}", html, count=1, flags=re.DOTALL)
+        # Lambda prevents re.subn from interpreting \n in new_js as literal newlines
+        js_snap = new_js
+        html, n = re.subn(pattern, lambda m, js=js_snap: m.group(1) + js, html, count=1, flags=re.DOTALL)
         if n == 0:
             raise ValueError(f"Could not find 'const {var_name} = [...]' in template.")
         print(f"  OK {var_name} injected ({len(rows)} rows)")
