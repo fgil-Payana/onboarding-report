@@ -30,6 +30,21 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: python update_report.py
 
+      - name: Verify output
+        run: |
+          python3 -c "
+          lines = open('_deploy/index.html', encoding='utf-8').readlines()
+          long = [(i+1, len(l)) for i,l in enumerate(lines) if len(l) > 1000]
+          print(f'Total lines: {len(lines)}')
+          print(f'Lines > 1000 chars: {len(long)}')
+          for ln, llen in long[:10]:
+              print(f'  Line {ln}: {llen} chars')
+          if long:
+              exit(1)
+          else:
+              print('OK - no long lines')
+          "
+
       - name: Publish to gh-pages
         run: |
           # 1. Primero mover el archivo a /tmp (fuera del repo)
