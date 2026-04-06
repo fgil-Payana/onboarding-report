@@ -32,21 +32,25 @@ jobs:
 
       - name: Publish to gh-pages
         run: |
-          # Guardar el HTML generado antes de cambiar de rama
-          cp _deploy/index.html /tmp/report.html
+          # 1. Primero mover el archivo a /tmp (fuera del repo)
+          mv _deploy/index.html /tmp/report.html
+          echo "✓ Archivo guardado en /tmp"
 
-          # Configurar git
+          # 2. Configurar git
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
-          # Cambiar a gh-pages
+          # 3. Ahora sí puede hacer checkout sin conflictos
           git fetch origin gh-pages
           git checkout gh-pages
+          echo "✓ En rama gh-pages"
 
-          # Reemplazar solo index.html
+          # 4. Copiar el reporte
           cp /tmp/report.html index.html
+          echo "✓ index.html copiado"
 
-          # Commit y push
+          # 5. Commit y push
           git add index.html
           git diff --staged --quiet && echo "Sin cambios" || git commit -m "Reporte $(date +'%Y-%m-%d')"
           git push origin gh-pages
+          echo "✓ Push completado"
