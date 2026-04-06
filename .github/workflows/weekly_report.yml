@@ -1,0 +1,46 @@
+name: Weekly Onboarding Report
+
+on:
+  schedule:
+    - cron: "0 14 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-report:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Update report
+        env:
+          POSTHOG_API_KEY:   ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_PROJECT:   ${{ secrets.POSTHOG_PROJECT }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: python update_report.py
+
+      # Verifica que el index.html fue generado correctamente
+      - name: Verify output
+        run: |
+          ls -lh index.html
+          echo "--- Primeras líneas del index.html generado ---"
+          head -5 index.html
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          publish_branch: gh-pages
+          exclude_assets: '.github,*.py,*.md,*.yml,payana_reporte_unificado.html'
