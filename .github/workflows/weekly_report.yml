@@ -52,34 +52,56 @@ jobs:
 
       - name: Publish to gh-pages
         run: |
-          # 1. Mover el archivo a /tmp (fuera del repo)
           mv _deploy/index.html /tmp/report.html
           echo "✓ Archivo guardado en /tmp"
 
-          # 2. Configurar git
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
-          # 3. Checkout a gh-pages
           git fetch origin gh-pages
           git checkout gh-pages
           echo "✓ En rama gh-pages"
 
-          # 4. Copiar el reporte
           cp /tmp/report.html index.html
           echo "✓ index.html copiado"
 
-          # 5. Commit y push
           git add index.html
           git diff --staged --quiet && echo "Sin cambios" || git commit -m "Reporte $(date +'%Y-%m-%d')"
           git push origin gh-pages
           echo "✓ Push completado"
 
-          # 6. Volver a main para que el paso Slack tenga el script disponible
-          git checkout main
-          echo "✓ Volvió a main"
-
       - name: Notify Slack
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: python update_report.py --slack-only
+        run: |
+          STATS=$(cat /tmp/report_stats.json)
+          P_TOTAL=$(echo $STATS | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['p_total'])")
+          P_BLOCKED=$(echo $STATS | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['p_blocked'])")
+          U_TOTAL=$(echo $STATS | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['u_total'])")
+          U_SIN_USO=$(echo $STATS | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['u_sin_uso'])")
+          M1_TOTAL=$(echo $STATS | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['m1_total'])")
+          M1_VENC=$(echo $STATS | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['m1_venc'])")
+          F4_TOTAL=$(echo $STATS | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['f4_total'])")
+          F4_COMP=$(echo $STATS | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['f4_completo'])")
+          TODAY=$(date +'%d %b %Y')
+
+          curl -s -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"blocks\": [
+                {\"type\": \"header\", \"text\": {\"type\": \"plain_text\", \"text\": \"Reporte Onboarding - $TODAY\"}},
+                {\"type\": \"section\", \"fields\": [
+                  {\"type\": \"mrkdwn\", \"text\": \"*Pipeline bloqueado*\n$P_TOTAL negocios, $P_BLOCKED con bloqueo\"},
+                  {\"type\": \"mrkdwn\", \"text\": \"*Uso Entrenamiento*\n$U_TOTAL ws, $U_SIN_USO sin uso 7d\"},
+                  {\"type\": \"mrkdwn\", \"text\": \"*Proyeccion M1*\n$M1_TOTAL pipeline, $M1_VENC vencidos\"},
+                  {\"type\": \"mrkdwn\", \"text\": \"*Facturas*\n$F4_TOTAL clientes, $F4_COMP con 4 facturas\"}
+                ]},
+                {\"type\": \"actions\", \"elements\": [{
+                  \"type\": \"button\",
+                  \"text\": {\"type\": \"plain_text\", \"text\": \"Ver reporte completo\"},
+                  \"url\": \"https://fgil-payana.github.io/onboarding-report/\",
+                  \"style\": \"primary\"
+                }]}
+              ]
+            }"
+          echo "✓ Slack enviado"
