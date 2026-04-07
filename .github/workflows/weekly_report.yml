@@ -52,7 +52,7 @@ jobs:
 
       - name: Publish to gh-pages
         run: |
-          # 1. Primero mover el archivo a /tmp (fuera del repo)
+          # 1. Mover el archivo a /tmp (fuera del repo)
           mv _deploy/index.html /tmp/report.html
           echo "✓ Archivo guardado en /tmp"
 
@@ -60,7 +60,7 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
-          # 3. Ahora sí puede hacer checkout sin conflictos
+          # 3. Checkout a gh-pages
           git fetch origin gh-pages
           git checkout gh-pages
           echo "✓ En rama gh-pages"
@@ -74,6 +74,10 @@ jobs:
           git diff --staged --quiet && echo "Sin cambios" || git commit -m "Reporte $(date +'%Y-%m-%d')"
           git push origin gh-pages
           echo "✓ Push completado"
+
+          # 6. Volver a main para que el paso Slack tenga el script disponible
+          git checkout main
+          echo "✓ Volvió a main"
 
       - name: Notify Slack
         env:
