@@ -52,8 +52,9 @@ jobs:
 
       - name: Publish to gh-pages
         run: |
-          mv _deploy/index.html /tmp/report.html
-          echo "✓ Archivo guardado en /tmp"
+          # Guardar el reporte generado en /tmp
+          cp _deploy/index.html /tmp/report.html
+          echo "✓ index.html guardado en /tmp"
 
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
@@ -62,10 +63,17 @@ jobs:
           git checkout gh-pages
           echo "✓ En rama gh-pages"
 
-          cp /tmp/report.html index.html
-          echo "✓ index.html copiado"
+          # Eliminar _deploy/ si existe (limpieza de runs anteriores)
+          if [ -d "_deploy" ]; then
+            git rm -rf _deploy/
+            echo "✓ _deploy/ eliminado"
+          fi
 
-          git add index.html
+          # Copiar el reporte a la raíz
+          cp /tmp/report.html index.html
+          echo "✓ index.html copiado a raíz"
+
+          git add -A
           git diff --staged --quiet && echo "Sin cambios" || git commit -m "Reporte $(date +'%Y-%m-%d')"
           git push origin gh-pages
           echo "✓ Push completado"
