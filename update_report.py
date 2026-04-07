@@ -11,9 +11,9 @@ import datetime
 import urllib.request
 import urllib.error
 
-POSTHOG_API_KEY  = os.environ["POSTHOG_API_KEY"]
+POSTHOG_API_KEY  = os.environ.get("POSTHOG_API_KEY", "")
 POSTHOG_PROJECT  = os.environ.get("POSTHOG_PROJECT", "260911")
-SLACK_WEBHOOK    = os.environ["SLACK_WEBHOOK_URL"]
+SLACK_WEBHOOK    = os.environ.get("SLACK_WEBHOOK_URL", "")
 POSTHOG_BASE     = f"https://us.posthog.com/api/projects/{POSTHOG_PROJECT}"
 TEMPLATE_FILE    = "template.html"
 OUTPUT_FILE      = "_deploy/index.html"
@@ -218,6 +218,8 @@ def send_slack(datasets):
 
 
 def main():
+    if not POSTHOG_API_KEY:
+        raise EnvironmentError("POSTHOG_API_KEY env var is required")
     print("=== Payana Onboarding Report ===")
     print(f"Date: {datetime.date.today().isoformat()}\n")
 
@@ -259,34 +261,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import sys
-    if "--slack-only" in sys.argv:
-        # Read pre-computed stats — no PostHog API call needed
-        print("Sending Slack notification (post-publish)...")
-        with open("/tmp/report_stats.json") as f:
-            s = json.load(f)
-        today_fmt  = datetime.date.today().strftime("%d %b %Y")
-        report_url = "https://fgil-payana.github.io/onboarding-report/"
-        payload = {"blocks": [
-            {"type": "header", "text": {"type": "plain_text", "text": f"Reporte Onboarding - {today_fmt}"}},
-            {"type": "section", "fields": [
-                {"type": "mrkdwn", "text": f"*Pipeline bloqueado*\n{s['p_total']} negocios, {s['p_blocked']} con bloqueo"},
-                {"type": "mrkdwn", "text": f"*Uso Entrenamiento*\n{s['u_total']} ws, {s['u_sin_uso']} sin uso 7d"},
-                {"type": "mrkdwn", "text": f"*Proyeccion M1*\n{s['m1_total']} pipeline, {s['m1_venc']} vencidos"},
-                {"type": "mrkdwn", "text": f"*Facturas*\n{s['f4_total']} clientes, {s['f4_completo']} con 4 facturas"},
-            ]},
-            {"type": "actions", "elements": [{
-                "type": "button",
-                "text": {"type": "plain_text", "text": "Ver reporte completo"},
-                "url": report_url,
-                "style": "primary",
-            }]},
-        ]}
-        body = json.dumps(payload).encode()
-        req  = urllib.request.Request(
-            SLACK_WEBHOOK, data=body, headers={"Content-Type": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            print(f"  Slack -> {resp.status}")
-    else:
-        main()
+    main()
