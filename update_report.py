@@ -118,8 +118,10 @@ def reformat_existing_arrays(html):
 
 
 def update_html(datasets):
-    with open(TEMPLATE_FILE, "r", encoding="utf-8") as f:
+    with open(TEMPLATE_FILE, "r", encoding="utf-8", newline="") as f:
         html = f.read()
+    # Normalize line endings — Git on Windows/some runners may add CRLF
+    html = html.replace("\r\n", "\n").replace("\r", "\n")
 
     # 1. Inject fresh data arrays (one row per line)
     for var_name, rows in datasets.items():
