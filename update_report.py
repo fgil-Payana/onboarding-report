@@ -45,9 +45,14 @@ def posthog_query(sql):
 
 def fetch_view(var_name, view_name):
     print(f"  Fetching {view_name} -> {var_name} ...", end=" ", flush=True)
-    rows = posthog_query(f"SELECT * FROM {view_name}")
-    print(f"{len(rows)} rows")
-    return rows
+    try:
+        rows = posthog_query(f"SELECT * FROM {view_name}")
+        print(f"{len(rows)} rows")
+        return rows
+    except Exception as e:
+        print(f"ERROR: {e}")
+        print(f"  WARNING: {var_name} fallo — se conservaran los datos existentes en el template.")
+        return None  # None = mantener los datos existentes en el HTML
 
 
 def json_serial(obj):
@@ -125,6 +130,9 @@ def update_html(datasets):
 
     # 1. Inject fresh data arrays (one row per line)
     for var_name, rows in datasets.items():
+        if rows is None:
+            print(f"  SKIP {var_name} (view error — keeping existing data)")
+            continue
         new_js  = to_js_json(rows)
         pattern = rf"(const {re.escape(var_name)}\s*=\s*)\[.*?\](?=\s*;)"
         js_snap = new_js
@@ -168,10 +176,10 @@ def update_html(datasets):
 
 
 def send_slack(datasets):
-    p_rows  = datasets["P_RAW"]
-    u_rows  = datasets["U_DATA"]
-    m1_rows = datasets["M1_DATA"]
-    f4_rows = datasets["F4_DATA"]
+    p_rows  = datasets.get("P_RAW")  or []
+    u_rows  = datasets.get("U_DATA") or []
+    m1_rows = datasets.get("M1_DATA") or []
+    f4_rows = datasets.get("F4_DATA") or []
 
     blocked     = sum(1 for r in p_rows if r.get("descripcion_block"))
     sin_uso     = sum(1 for r in u_rows if (r.get("usos_totales_ultimos_7d") or 0) == 0)
@@ -224,11 +232,15 @@ def main():
         f.write(updated_html)
     print(f"\n3. Written -> {OUTPUT_FILE}")
 
-    print("\n4. Sending Slack notification...")
-    send_slack(datasets)
-
     print("\nDone.")
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--slack-only" in sys.argv:
+        # Re-fetch only counts for Slack (light queries)
+        print("Sending Slack notification (post-publish)...")
+        datasets = {var: fetch_view(var, view) for var, view in VIEWS.items()}
+        send_slack(datasets)
+    else:
+        main()
