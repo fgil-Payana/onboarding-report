@@ -232,15 +232,61 @@ def main():
         f.write(updated_html)
     print(f"\n3. Written -> {OUTPUT_FILE}")
 
+    # Save stats for Slack notification (read after publish, without re-fetching)
+    today_s = datetime.date.today().isoformat()
+    p_rows  = datasets.get("P_RAW")  or []
+    u_rows  = datasets.get("U_DATA") or []
+    m1_rows = datasets.get("M1_DATA") or []
+    f4_rows = datasets.get("F4_DATA") or []
+    stats = {
+        "p_total":    len(p_rows),
+        "p_blocked":  sum(1 for r in p_rows if r.get("descripcion_block")),
+        "u_total":    len(u_rows),
+        "u_sin_uso":  sum(1 for r in u_rows if (r.get("usos_totales_ultimos_7d") or 0) == 0),
+        "m1_total":   len(m1_rows),
+        "m1_venc":    sum(1 for r in m1_rows
+                         if not r.get("fecha_m1_facturado")
+                         and r.get("fecha_forecast_m1")
+                         and str(r["fecha_forecast_m1"]) < today_s),
+        "f4_total":   len(f4_rows),
+        "f4_completo": sum(1 for r in f4_rows if "Completó 4" in (r.get("estado_pago") or "")),
+    }
+    with open("/tmp/report_stats.json", "w") as f:
+        json.dump(stats, f)
+    print("\n4. Stats saved -> /tmp/report_stats.json")
+
     print("\nDone.")
 
 
 if __name__ == "__main__":
     import sys
     if "--slack-only" in sys.argv:
-        # Re-fetch only counts for Slack (light queries)
+        # Read pre-computed stats — no PostHog API call needed
         print("Sending Slack notification (post-publish)...")
-        datasets = {var: fetch_view(var, view) for var, view in VIEWS.items()}
-        send_slack(datasets)
+        with open("/tmp/report_stats.json") as f:
+            s = json.load(f)
+        today_fmt  = datetime.date.today().strftime("%d %b %Y")
+        report_url = "https://fgil-payana.github.io/onboarding-report/"
+        payload = {"blocks": [
+            {"type": "header", "text": {"type": "plain_text", "text": f"Reporte Onboarding - {today_fmt}"}},
+            {"type": "section", "fields": [
+                {"type": "mrkdwn", "text": f"*Pipeline bloqueado*\n{s['p_total']} negocios, {s['p_blocked']} con bloqueo"},
+                {"type": "mrkdwn", "text": f"*Uso Entrenamiento*\n{s['u_total']} ws, {s['u_sin_uso']} sin uso 7d"},
+                {"type": "mrkdwn", "text": f"*Proyeccion M1*\n{s['m1_total']} pipeline, {s['m1_venc']} vencidos"},
+                {"type": "mrkdwn", "text": f"*Facturas*\n{s['f4_total']} clientes, {s['f4_completo']} con 4 facturas"},
+            ]},
+            {"type": "actions", "elements": [{
+                "type": "button",
+                "text": {"type": "plain_text", "text": "Ver reporte completo"},
+                "url": report_url,
+                "style": "primary",
+            }]},
+        ]}
+        body = json.dumps(payload).encode()
+        req  = urllib.request.Request(
+            SLACK_WEBHOOK, data=body, headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            print(f"  Slack -> {resp.status}")
     else:
         main()
