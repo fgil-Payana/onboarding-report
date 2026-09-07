@@ -442,7 +442,7 @@ tbody tr.total-row td{font-weight:700;background:var(--bg);border-top:2px solid 
 // ══════════════════════════════════════════
 // SHARED HELPERS
 // ══════════════════════════════════════════
-const TODAY = new Date('2026-08-31');
+const TODAY = new Date('2026-09-07');
 const fmtMRR = n => '$'+Math.round(n).toLocaleString('es-CO');
 const daysFrom = s => s ? Math.floor((TODAY-new Date(s))/86400000) : null;
 const ageRange = d => {
@@ -1108,7 +1108,7 @@ renderUDetail(U_DATA);
 // ══════════════════════════════════════════
 // FACTURAS DATA
 // ══════════════════════════════════════════
-const TODAY_F = new Date('2026-08-31');
+const TODAY_F = new Date('2026-09-07');
 const fmtDate = s => { if(!s||s==='') return '—'; try{ const p=s.substring(0,10).split('-'); return new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}); }catch(e){return '—';} };
 const parseLocalDate = s => { if(!s||s==='') return null; try{ const p=s.substring(0,10).split('-'); return new Date(+p[0],+p[1]-1,+p[2]); }catch(e){return null;} };
 
